@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TabFit Focus</title>
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <header>
+    <a class="wordmark" href="popup.html" aria-label="TabFit home"><i class="mark" aria-hidden="true"></i>TabFit<span>focus</span></a>
+    <span id="connection-status" class="connection"><i></i>Not connected</span>
+  </header>
+  <main>
+    <section id="setup-view">
+      <div class="eyebrow"><span></span> A little space for deep work</div>
+      <h1>One thing.<br>Your full attention.</h1>
+      <p class="intro">Tell TabFit what matters. Let the rest wait a little.</p>
+      <form id="session-form">
+        <label for="goal">What are you working on? <span id="goal-count">0 / 600</span></label>
+        <textarea id="goal" name="goal" rows="3" maxlength="600" minlength="3" required placeholder="e.g. Build the sign-in flow for my app"></textarea>
+        <p class="hint">Be specific. Jev uses this to understand which pages help.</p>
+        <fieldset>
+          <legend>Make some time</legend>
+          <div class="durations">
+            <label><input type="radio" name="minutes" value="25" checked><span><strong>25</strong> min<small>A fresh start</small></span></label>
+            <label><input type="radio" name="minutes" value="50"><span><strong>50</strong> min<small>A deeper dive</small></span></label>
+            <label><input type="radio" name="minutes" value="90"><span><strong>90</strong> min<small>Room to build</small></span></label>
+          </div>
+        </fieldset>
+        <button class="primary start" id="start-button" type="submit">Start focusing <span aria-hidden="true">↗</span></button>
+      </form>
+      <p class="privacy-note">During a session, your task and page details go to TypeSafe for a relevance check. You can always override a block.</p>
+    </section>
+
+    <section id="session-view" hidden>
+      <div class="session-heading"><div class="eyebrow"><span></span><b id="session-label">You’re in focus</b></div><span class="live-label" id="live-label">LIVE</span></div>
+      <div class="timer-wrap">
+        <svg viewBox="0 0 180 180" aria-hidden="true"><circle class="track" cx="90" cy="90" r="79"/><circle id="progress-ring" cx="90" cy="90" r="79"/></svg>
+        <div class="timer-content"><div id="timer">25:00</div><span id="timer-caption">time for what matters</span></div>
+      </div>
+      <div class="goal-card"><div class="eyebrow">Your intention</div><p id="active-goal"></p></div>
+      <div class="stats"><div><strong id="checked-count">0</strong><span>pages checked</span></div><i></i><div><strong id="blocked-count">0</strong><span>distractions caught</span></div></div>
+      <p id="last-decision" class="last-decision">Jev will check the page you’re viewing.</p>
+      <div class="session-actions"><button id="pause-button" class="secondary" type="button">Pause session</button><button id="end-button" class="text-button" type="button">Finish session</button></div>
+    </section>
+
+    <div id="message" class="message" role="status" hidden></div>
+    <details id="settings-panel">
+      <summary><span>Connection & privacy</span><span aria-hidden="true">+</span></summary>
+      <form id="settings-form">
+        <div class="setup-steps"><strong>A one-time connection</strong><p>Start the local gateway, then paste the connection code it prints. Your TypeSafe key stays in the gateway.</p><code>cd tabfit<br>npm start</code><p>Add your key to <code>.env</code> first. Setup instructions are in this project’s README.</p></div>
+        <label for="connection-code">Gateway connection code</label>
+        <input id="connection-code" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your connection code">
+        <label for="exclusions">Never inspect these sites</label>
+        <textarea id="exclusions" rows="4" spellcheck="false" placeholder="mail.google.com&#10;your-bank.com"></textarea>
+        <p class="hint">One domain per line. Subdomains are included.</p>
+        <button class="secondary" type="submit" id="save-settings">Save & check connection</button>
+        <p class="privacy-detail">Only the active tab is checked during a running session. We send the page address without query parameters or fragments, its title, description, and up to 4,000 characters of page text. Form fields and editable areas are skipped. Page text may still contain personal information; exclude sites you want kept private.</p>
+        <p class="privacy-detail">PDFs are downloaded from their original site and read locally. Only a text excerpt (up to 4,000 characters from the first 10 pages) goes to TypeSafe. Scanned, password-protected or unreadable PDFs stay accessible. The reading limit is 12 MB.</p>
+        <p class="privacy-detail">No screenshots or browsing history are collected. Private windows, local addresses, and browser settings pages are excluded. Session decisions are cleared when you finish or restart the browser. Your last task and settings stay on this device.</p>
+      </form>
+    </details>
+  </main>
+  <footer><span>Less noise. More intention.</span><span>Decisions by Jev <i aria-hidden="true">✳</i></span></footer>
+</body>
+</html>
