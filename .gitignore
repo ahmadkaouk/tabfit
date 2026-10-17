@@ -1,7 +1,3 @@
-.env
-.env.*
-!.env.example
-.gateway-token
 node_modules/
 test-results/
 .DS_Store

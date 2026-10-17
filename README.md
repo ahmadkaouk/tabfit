@@ -1,61 +1,109 @@
-# TabFit
+<p align="center">
+  <img src="extension/icons/icon-128.png" width="72" height="72" alt="">
+</p>
 
-Describe what you're working on, choose a 25, 50 or 90 minute session, and let Jev check whether the page you're viewing supports that goal. Clear distractions get a reversible focus screen. Ambiguous pages stay accessible.
+<h1 align="center">TabFit</h1>
 
-TabFit is a standalone Manifest V3 browser extension that checks whether each page supports your current task and blocks clear distractions. It needs no build step to load: a pinned copy of Mozilla PDF.js and its supporting assets is bundled for local PDF reading, and the Instrument Sans and JetBrains Mono typefaces are bundled so the popup and focus screen never fetch web fonts. The popup, focus screen and notices follow your system's light or dark appearance. No server, native helper or Node installation is needed to use the extension.
+<p align="center">
+  A focus timer that knows what you're working on.<br>
+  Describe your task, start a session, and TabFit keeps off-task pages out of your way.
+</p>
 
-![Focus-session setup](preview/setup.png)
+<p align="center">
+  <sub>Powered by <strong>Jev</strong> from <a href="https://docs.typesafe.ai">TypeSafe</a></sub>
+</p>
 
-## Get started
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
+    <img src="docs/screenshots/hero-light.png" width="880" alt="TabFit's focus screen covering an off-task page, with the TabFit popup open and showing the session timer">
+  </picture>
+</p>
 
-You need Chrome 125 or newer (or a compatible Chromium browser such as Helium) and your own TypeSafe API key. Requests are billed to your TypeSafe account.
+Most site blockers work from a list of banned websites, and lists don't know what you're doing: a YouTube video can be the tutorial you need, and a documentation site can be a rabbit hole. TabFit starts from your task instead. During a focus session it asks Jev, a model available through the [TypeSafe API](https://docs.typesafe.ai/api), whether the page you're viewing supports that task. Clear distractions get a focus screen; everything else stays open.
 
-### 1. Load the extension
+- **Judged against your task, not a category.** A work-related video or social post can be on task.
+- **You stay in charge.** Go back, allow the page for this session, or end the session. Blocks are always reversible.
+- **Cautious when unsure.** If Jev isn't confident, the page stays open with a small notice.
+- **Reads PDFs locally.** PDFs are parsed on your device with bundled PDF.js; only a text excerpt is sent.
+- **Private by design.** Only the active tab, only during a session. Email and sign-in sites are skipped, and you can add your own.
+- **No server, no account.** The extension calls TypeSafe directly with your own API key. There are no analytics.
 
-1. Open `chrome://extensions` in your browser.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and select this project's **`extension`** folder (the folder containing `manifest.json`).
-4. Pin **TabFit** using the extensions menu.
+## How it works
 
-### 2. Save your TypeSafe API key
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/popup-dark.png">
+    <img src="docs/screenshots/popup-light.png" width="880" alt="The TabFit popup: describing a task, a running session with its timer, and settings">
+  </picture>
+</p>
 
-Open TabFit, click **Add API key** in the top-right corner to open **Settings & privacy**, enter your key in **TypeSafe API key**, and click **Save settings**. The field clears after saving and displays a saved-key placeholder. Leaving it blank on later saves keeps your existing key; entering another key replaces it. **Remove** deletes it and pauses any active session.
+1. **Describe your task.** Be concrete: “Build the authentication flow for my React app” works better than “coding”.
+2. **Choose 25, 50 or 90 minutes** and click **Start focus**.
+3. **Browse as usual.** Each page you open or switch to is checked, including route changes inside web apps. Pages stay usable while they're checked.
 
-The **Saved** status confirms local storage, not provider authentication. Saving a key and opening the popup make no API requests. Your first page check verifies that TypeSafe accepts the key. Authentication failures explain how to update it, and pages stay accessible.
+| Jev's answer | What happens |
+| --- | --- |
+| On task | Nothing. The page stays open. |
+| Off task | A focus screen covers the page. Go back, allow this page, or end the session. |
+| Unsure | The page stays open with a dismissible notice. |
+| Check failed | The page stays open, and a notice explains what went wrong. |
 
-The extension's background worker calls Jev directly over HTTPS. There is no terminal, background server, connection code or separate helper installation.
+**Pause** removes all blocks and keeps your remaining time. **End session**, or reaching the end of the timer, removes all blocks and clears the session's decisions and allowed pages.
 
-### 3. Focus
+## Install
 
-Describe a concrete task, for example “Build the authentication flow for my React app,” choose a duration, and click **Start focus**. Your current tab is checked, including tabs opened before the extension was loaded. Navigating, switching tabs, and client-side route changes trigger new checks; changing content is sampled every 30 seconds during a session.
+TabFit isn't in the Chrome Web Store yet, so you load it as an unpacked extension. You need Chrome 125 or newer (or a compatible Chromium browser such as Helium) and your own [TypeSafe](https://docs.typesafe.ai/api) API key. Page checks are billed to your TypeSafe account.
 
-- **On task:** the page stays accessible.
-- **Off task:** a focus screen covers the page. Go back, allow this particular page for this session, or end the session.
-- **Uncertain:** the page stays accessible with a dismissible notice.
-- **PDF unreadable:** scanned, password-protected, oversized, damaged or inaccessible PDFs stay open with an extraction-specific message. Jev is not called without readable PDF text.
-- **Pause:** removes all blocks and stops checks; the remaining session time is preserved.
-- **End session or timer expiry:** removes all blocks and clears session decisions and overrides.
-- **API failure:** pages remain accessible, with an actionable notice. Failures apply a 30-second cooldown before more requests, and the notice keeps showing the original cause during that delay.
+1. Download this repository:
 
-Notices appear in the **top-right corner** and are shown only during a confirmed active session. Ending, pausing or reaching the session deadline clears them. If a content script loses its extension connection (for example after an update), it clears its UI and old session state quietly instead of repeatedly showing “TabFit is unavailable.”
+   ```sh
+   git clone https://github.com/ahmadkaouk/tabfit.git
+   ```
 
-An override applies to the exact URL, including its query and fragment, for this session. It survives reloading the page, and does not allow the whole website. Ending the session clears it.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and select the **`extension`** folder (the one containing `manifest.json`).
+4. Pin **TabFit** from the extensions menu.
 
-### Updating an installed copy
+No build step, server or Node installation is needed to use it.
 
-After pulling changes, open `chrome://extensions` (or `helium://extensions`) and click **Reload** on TabFit. Your saved API key, privacy settings and last goal are preserved; reloading clears the running session.
+### Add your API key
 
-When upgrading from the gateway/helper version, enter your TypeSafe key once in **Settings & privacy**. Old `.env` files are not imported automatically. Version 0.4 removes the gateway, helper installer and native messaging permission. Any old standalone gateway can be stopped, and the old helper's browser registration can be removed; neither is used by this version.
+Open TabFit and click **Add API key** in the top-right corner. Paste your key into **TypeSafe API key** and click **Save settings**.
 
-## PDF text extraction
+- The key is stored only in this browser profile and is sent only to TypeSafe.
+- **Saved** means the key is stored. TypeSafe verifies it on your first page check; if it's rejected, a notice explains how to update it and pages stay open.
+- Leaving the field blank on later saves keeps your key; pasting a new one replaces it. **Remove** deletes it and pauses any running session.
 
-During a session, a PDF opened in the browser's built-in viewer is downloaded from that tab's original URL and parsed locally with bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/). This also supports PDF responses whose URL does not end in `.pdf`. The original site may receive its existing login cookies and query parameters for the download; TypeSafe never receives those URL parameters or the PDF file itself. Redirected downloads are rejected. Excluded domains are checked before downloading.
+### Update
 
-The reader extracts at most **4,000 characters from the first 10 pages**, with a **12 MB download limit** and **12-second reading timeout**. Jev receives the excerpt and a description of its page coverage. PDF scripts and forms are not executed. There is no OCR: image-only scans cannot be classified from their images, and password-protected files are not unlocked. An unreadable document is kept accessible rather than classified from a filename alone.
+Run `git pull`, then click **Reload** on TabFit in `chrome://extensions`. Your key, settings and last task are kept; a running session is cleared.
 
-The extension temporarily keeps at most eight PDF excerpts in service-worker memory for five minutes to avoid repeated downloads. Failures can be retried after 30 seconds. This cache is never written to extension storage and is cleared on pause, session end, settings changes, extension reload or worker shutdown. Late extraction results are checked against the current session and tab before anything is sent to Jev.
+## Privacy
 
-## What leaves the browser
+TabFit only looks at the active tab, and only during a focus session. Each check sends TypeSafe:
+
+- your task (up to 600 characters);
+- the page's address, without its query string or fragment;
+- the page title, description and up to 4,000 characters of visible text.
+
+Form fields, editable areas, screenshots, cookies and browsing history are never sent. Private windows, local and internal addresses, browser pages, and common email and sign-in sites are never checked. Add any other site under **Never check these sites**; subdomains are included. Nothing is sent without a saved key and a running session.
+
+Page text can still contain personal information, so exclude sites you want kept private. The full data flow is described under [Technical details](#technical-details).
+
+## Limitations
+
+- TabFit is a self-control aid, not a lock. It covers a page rather than blocking its network requests, and disabling the extension turns it off.
+- An off-task page is visible for a second or two, until Jev answers, before the focus screen appears.
+- Only text is analyzed. Images, canvas content, cross-origin frames and transcripts that aren't in the page's readable text are not. Media inside embedded frames and Web Audio aren't paused.
+- PDFs are sampled from their first 10 pages. Scans (there is no OCR), password-protected files and PDFs inside other sites' viewers may not be readable.
+- Some protected browser pages can't run extensions, so they can't be covered.
+- Jev can be wrong. The decision thresholds are provisional product choices, not measured accuracy. Try it on your own tasks before relying on it.
+
+## Technical details
+
+<details>
+<summary><strong>What leaves the browser</strong></summary>
 
 Only eligible active tabs are inspected, during running focus sessions. The background worker sends an HTTPS request directly to the TypeSafe API containing:
 
@@ -63,49 +111,68 @@ Only eligible active tabs are inspected, during running focus sessions. The back
 - The page's origin and path, up to 1,500 characters. Query strings, fragments and URL credentials are not sent.
 - The title (200 characters), description (350), and up to 4,000 characters of text, preferring the main article or main region for webpages, or the first pages for PDFs.
 
-Form controls, forms, editable regions, hidden elements, scripts and navigation are omitted from the text excerpt. This is minimization, not a guarantee that a page contains no personal information: titles, descriptions, paths and visible text can still be sensitive. Add email, banking, internal work tools or other private sites to **Never check these sites**. A domain exclusion includes all its subdomains and applies before content is extracted.
+Form controls, forms, editable regions, hidden elements, scripts and navigation are omitted from the text excerpt. This is minimization, not a guarantee that a page contains no personal information: titles, descriptions, paths and visible text can still be sensitive. A domain exclusion includes all its subdomains and applies before content is extracted.
 
-Email and sign-in domains are excluded by default. Private windows, IP addresses, local hostnames, common internal suffixes and browser-internal pages are excluded. There are no screenshots, browser-history reads, analytics or raw page-text logs. The extension doesn't retain raw page payloads after the bounded in-memory processing described above. TypeSafe's own data handling applies to requests it receives.
+`mail.google.com`, `outlook.live.com`, `outlook.office.com`, `accounts.google.com` and `login.microsoftonline.com` are excluded by default. Private windows, IP addresses, local hostnames, common internal suffixes and browser-internal pages are always excluded. There are no screenshots, browser-history reads, analytics or raw page-text logs. TypeSafe's own data handling applies to requests it receives.
 
-The API key, exclusions, last focus goal and selected duration are stored locally in Chrome, accessible only to extension-owned contexts. They are not synced. Current session state, hashes of page evidence, decisions, exact-page override hashes and the last checked hostname are held in `chrome.storage.session`, so they survive a worker suspension but are cleared on browser restart, extension reload or session completion. Page excerpts and full URLs are never stored in extension storage. Your API key is stored in `chrome.storage.local` with access restricted to trusted extension contexts. Popup state responses expose only whether a key is saved; they never return its value. Content scripts and websites cannot read the key through extension storage or messaging. The key is sent only in the Authorization header to TypeSafe. Browser storage is not an OS keychain; someone with access to your browser profile or the extension itself may retrieve it. No shared developer key is bundled with the extension.
+The API key, exclusions, last focus goal and selected duration are stored locally in `chrome.storage.local`, accessible only to extension-owned contexts, and are not synced. Current session state, hashes of page evidence, decisions, hashes of allowed pages and the last checked hostname are held in `chrome.storage.session`, so they survive a worker suspension but are cleared on browser restart, extension reload or session end. Page excerpts and full URLs are never written to extension storage.
 
-The TypeSafe endpoint is fixed in code. Requests omit cookies and referrers, reject redirects, bound response size, and never forward raw provider error bodies. Page checks are cancelled when you pause, finish, remove the key or change settings. No requests are made without a saved key and an active session.
+Popup state responses only say whether a key is saved; they never return it. Content scripts and websites can't read the key through extension storage or messaging, and it is sent only in the `Authorization` header to TypeSafe. Browser storage is not an OS keychain: someone with access to your browser profile could retrieve it. No shared developer key is bundled.
 
-## How decisions work
+The TypeSafe endpoint is fixed in code. Requests omit cookies and referrers, reject redirects, bound the response size and never forward raw provider error bodies. Page checks are cancelled when you pause, end the session, remove the key or change settings.
 
-The background worker calls `POST https://api.typesafe.ai/v1/systemone` with `model: "jev-latest"` and one `Choice` question: `on_task`, `off_task` or `uncertain`. It supplies the goal separately from page evidence and instructs Jev to treat page text as data, not instructions. A work-related video or social post can be on task; the site's general category is not enough to block it.
+</details>
 
-Only a valid `off_task` answer with probability at least **0.85** blocks. An `on_task` answer needs at least **0.70** to be shown as on task. Everything else is uncertain and allowed. These are provisional product thresholds, not measured accuracy claims. Test on representative tasks and browsing examples before treating the judgments as reliable. The displayed reason is a fixed explanation of the classification; it is not a model-generated rationale.
+<details>
+<summary><strong>How decisions work</strong></summary>
 
-Decisions are cached for five minutes against the session, exact page identity and extracted evidence, with at most 100 entries. Matching concurrent requests share one call. Page changes and session transitions invalidate outdated results. The API client performs at most one delayed retry for 429/529 responses and uses an 11-second provider timeout. It allows at most four concurrent requests and 60 checks per minute while the worker is running; TypeSafe also enforces its own limits. The default model is `jev-latest`.
+The background worker calls `POST https://api.typesafe.ai/v1/systemone` with `model: "jev-latest"` and one `Choice` question whose answers are `on_task`, `off_task` or `uncertain`. It supplies the goal separately from the page evidence and instructs Jev to treat page text as data, not instructions. The site's general category is not enough to block a page.
 
-API contracts: [TypeSafe HTTP API](https://docs.typesafe.ai/api), [Choice](https://docs.typesafe.ai/primitives/choice), [confidence](https://docs.typesafe.ai/confidence). Browser implementation: [Chrome content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts), [session storage](https://developer.chrome.com/docs/extensions/reference/api/storage), [navigation events](https://developer.chrome.com/docs/extensions/reference/api/webNavigation).
+Only a valid `off_task` answer with probability of at least **0.85** blocks. An `on_task` answer needs at least **0.70** to be shown as on task. Everything else is treated as uncertain and allowed. The reason shown on the focus screen is a fixed explanation of the classification, not a model-generated rationale.
 
-## Development and verification
+Decisions are cached for five minutes against the session, the exact page and the extracted evidence, with at most 100 entries. Matching concurrent requests share one call. Page changes and session transitions invalidate outdated results. Page content is re-sampled every 30 seconds during a session.
 
-Development commands require Node.js 22 or newer.
+The API client retries a 429 or 529 response once after a short delay and uses an 11-second timeout. It allows at most four concurrent requests and 60 checks per minute; TypeSafe also enforces its own limits. A failed check pauses further requests for 30 seconds, and the notice keeps showing the original cause during that time.
+
+Allowing a page applies to that exact URL, including its query and fragment, for the current session. It survives a reload and doesn't allow the rest of the site.
+
+References: [TypeSafe HTTP API](https://docs.typesafe.ai/api), [Choice](https://docs.typesafe.ai/primitives/choice), [confidence](https://docs.typesafe.ai/confidence), [Chrome content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts), [storage](https://developer.chrome.com/docs/extensions/reference/api/storage), [navigation events](https://developer.chrome.com/docs/extensions/reference/api/webNavigation).
+
+</details>
+
+<details>
+<summary><strong>PDF text extraction</strong></summary>
+
+During a session, a PDF opened in the browser's built-in viewer is downloaded from that tab's original URL and parsed locally with bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/). This also works for PDF responses whose URL doesn't end in `.pdf`. The original site may receive its usual login cookies and query parameters for the download; TypeSafe never receives those URL parameters or the PDF file itself. Redirected downloads are rejected, and excluded domains are checked before downloading.
+
+The reader extracts at most **4,000 characters from the first 10 pages**, with a **12 MB download limit** and a **12-second reading timeout**. Jev receives the excerpt and a description of which pages it covers. PDF scripts and forms are not executed. Scanned, password-protected, oversized or damaged PDFs stay open with a message explaining why; Jev is never asked to judge a PDF from its filename alone.
+
+At most eight PDF excerpts are kept in service-worker memory for five minutes to avoid repeated downloads. This cache is never written to extension storage and is cleared on pause, session end, settings changes, extension reload or worker shutdown. Late extraction results are checked against the current session and tab before anything is sent.
+
+</details>
+
+## Development
+
+Development needs Node.js 22 or newer. The extension itself has no build step.
 
 ```sh
-npm test
-npm run check
+npm test        # unit tests
+npm run check   # manifest assets and JavaScript syntax
 ```
 
-The dependency-free tests cover probability validation, data minimization, exclusions, cache restoration, request deduplication, overrides, pause/resume, expiry, navigation and session races, API authentication failures, fixed-endpoint requests, rate limits, invalid model replies, cancellation and provider timeouts. PDF tests cover download limits, excerpt limits, unreadable files, query-string minimization and stale extraction results. Provider responses are fixtures; these tests do not measure live Jev accuracy.
+The unit tests are dependency-free. They cover probability validation, data minimization, exclusions, caching, request deduplication, overrides, pause and resume, expiry, navigation and session races, API authentication failures, rate limits, invalid model replies, cancellation, timeouts and PDF limits. Provider responses are fixtures, so these tests don't measure Jev's accuracy.
 
-An optional browser smoke test uses Playwright and a Chromium build that accepts unpacked extensions:
+An optional browser smoke test loads the extension into a fresh temporary profile with Playwright, replaces the TypeSafe endpoint with a local mock, and exercises the whole flow: key handling, sessions, blocks, overrides, PDFs, single-page-app navigation, provider failures and extension reloads. It never uses your browsing profile or calls TypeSafe.
 
 ```sh
-# Install Playwright separately if it isn't already available.
 npm install --no-save --package-lock=false playwright
 npx playwright install chromium
 node tests/browser-smoke.mjs
 ```
 
-`PLAYWRIGHT_MODULE` can point to an existing Playwright module, and `CHROMIUM_PATH` can select a Chromium executable. The smoke test opens a fresh temporary browser profile and extension copy, replaces the fixed TypeSafe endpoint in that copy with a local mock provider, and exercises direct background-worker requests with fake API keys. It also serves synthetic pages and real compressed PDF fixtures locally. It does not use your browsing profile or call TypeSafe. Screenshots go to `test-results/`. `PDF_FIXTURE_PATH` can optionally select a local résumé PDF containing the word “inference” for the on-task PDF fixture.
+`PLAYWRIGHT_MODULE` can point to an existing Playwright module and `CHROMIUM_PATH` to a Chromium executable. Screenshots are written to `test-results/`. `PDF_FIXTURE_PATH` can select a local PDF containing the word “inference” for the on-task PDF case.
 
-Verified locally: unit tests, manifest/syntax checks, and browser smoke checks in an isolated Helium profile. Browser checks include key save/replace/removal, persistence across browser restart, blank-field preservation, denial of content-script storage and popup-action access, no synced credentials, session lifecycle, blocks and overrides, PDFs, late replies, provider failures, and extension reloads. A live request directly from a Helium extension worker using Jev 1.13.0 also allowed a synthetic React authentication tutorial. These checks verify integration behavior, not general model accuracy.
-
-To refresh the bundled PDF.js assets after changing the pinned development dependency:
+To refresh the bundled PDF.js after changing its pinned version:
 
 ```sh
 npm ci --ignore-scripts --omit=optional
@@ -113,32 +180,25 @@ npm run vendor:pdfjs
 npm run check
 ```
 
-The vendoring script copies the matching legacy API/worker builds, character maps, standard fonts and licenses into `extension/vendor/pdfjs`. No remotely hosted JavaScript is loaded at runtime. PDF.js 6.4.299 requires Node 22.13+ for dependency tooling; its legacy browser build supports Chrome 125+.
-
-`extension/vendor/fonts` holds the latin and latin-ext subsets of Instrument Sans and JetBrains Mono (variable weight, from `@fontsource-variable/instrument-sans` and `@fontsource-variable/jetbrains-mono`); versions are in `VERSION` and the SIL Open Font License in `LICENSE`. The popup loads them with `@font-face`. Shadow roots ignore `@font-face`, so the focus screen asks the background worker for the font data and registers it with the FontFace API; the files are not web-accessible resources.
-
-Files:
+No remotely hosted code or web fonts are loaded at runtime. `extension/vendor/pdfjs` holds PDF.js and its licenses. `extension/vendor/fonts` holds the latin and latin-ext subsets of Instrument Sans and JetBrains Mono; the popup loads them with `@font-face`, and the focus screen receives them from the background worker because shadow roots ignore `@font-face`.
 
 ```text
-extension/manifest.json  Chrome permissions and entry points
-extension/background.js Session coordination, settings and private key access
-extension/jev-client.js  Direct TypeSafe requests, cancellation and error handling
-extension/session.js    Session lifecycle, cache and stale-result protection
-extension/core.js       Page validation, Jev rubric and decision thresholds
-extension/content.js    Text extraction and reversible focus screen
-extension/pdf-client.js Session-scoped PDF reader coordination and memory cache
-extension/pdf-reader.js Bounded PDF download and text extraction
-extension/pdf-offscreen.* Hidden document hosting the local PDF.js worker
-extension/vendor/pdfjs/ Pinned PDF.js runtime assets and licenses
-extension/vendor/fonts/  Bundled Instrument Sans, JetBrains Mono and licenses
-extension/popup.*        Focus-session, API key and privacy settings
-tests/                  Unit, HTTP integration and browser smoke checks
+extension/manifest.json    Permissions and entry points
+extension/background.js    Session coordination, settings and API key access
+extension/jev-client.js    TypeSafe requests, cancellation and error handling
+extension/session.js       Session lifecycle, cache and stale-result protection
+extension/core.js          Page validation, Jev rubric and decision thresholds
+extension/content.js       Text extraction, focus screen and notices
+extension/pdf-client.js    PDF reader coordination and memory cache
+extension/pdf-reader.js    Bounded PDF download and text extraction
+extension/pdf-offscreen.*  Hidden document hosting the PDF.js worker
+extension/popup.*          Popup: sessions, API key and privacy settings
+extension/vendor/          Bundled PDF.js and fonts, with their licenses
+scripts/                   Asset checks, PDF.js vendoring and icon generation
+tests/                     Unit tests and the browser smoke test
+docs/screenshots/          Images used in this README
 ```
 
-## Prototype limits
+## License
 
-This is a self-control aid. It covers a loaded page rather than preventing its network requests, and can be bypassed by disabling the extension. Pages stay usable while they are checked, so an off-task page is visible until Jev answers, usually a second or two, before the focus screen appears. Main-document audio/video is paused when the screen appears; embedded frame media and Web Audio are not controlled. Images, canvas content, cross-origin frames and transcripts that aren't in the readable DOM are not analyzed. PDFs are sampled from their first pages; scans, encrypted files and PDFs embedded inside unrelated webpage viewers may not be readable. Some protected Chrome pages cannot run content scripts.
-
-Broad HTTP/HTTPS site access is required to inspect arbitrary browsing during a session. This version is for local unpacked use. A public release needs the Chrome Web Store privacy and permission review. Each user supplies their own TypeSafe API key; a shared product key must not be shipped in an extension.
-
-No live TypeSafe call is required for the automated checks. Verify live behavior with your own key and representative pages before relying on automatic blocking.
+TabFit is released under the [MIT License](LICENSE). Bundled third-party components keep their own licenses: [PDF.js](extension/vendor/pdfjs/LICENSE) (Apache 2.0), and [Instrument Sans and JetBrains Mono](extension/vendor/fonts/LICENSE) (SIL Open Font License 1.1).
