@@ -110,6 +110,34 @@ test("provider failure allows browsing and applies a cooldown", async () => {
   assert.equal(calls, 2);
 });
 
+for (const message of [
+  "Could not reach Jev. This page is still accessible.",
+  "TypeSafe did not accept the API key. Update it in Settings & privacy.",
+]) {
+  test(`cooldown preserves the actual failure: ${message}`, async () => {
+    let calls = 0;
+    const { check, advance, saved } = await fixture(async () => {
+      if (++calls === 1) throw new Error(message);
+      return { status: "allow" };
+    });
+    assert.deepEqual(await check(), { status: "error", message });
+    assert.deepEqual(await check({ tabId: 2 }), { status: "error", message });
+    assert.equal(calls, 1, "A retry during cooldown must not call the provider");
+    assert.equal(JSON.stringify(saved()).includes(message), false, "Failure details stay in memory");
+    advance(31000);
+    assert.equal((await check()).status, "allow", "Checks recover after connectivity is restored");
+    assert.equal(calls, 2);
+  });
+}
+
+test("an unspecified failure does not claim Jev is down", async () => {
+  const { check } = await fixture(async () => { throw new Error(); });
+  const failure = await check();
+  assert.equal(failure.status, "error");
+  assert.match(failure.message, /Page checks are unavailable/);
+  assert.deepEqual(await check(), failure);
+});
+
 test("PDF evidence is extracted before classification; only the sanitized excerpt is sent or cached", async () => {
   let sent;
   let source;
@@ -160,3 +188,28 @@ for (const action of ["end", "pause", "navigate", "override"]) {
     assert.equal(calls, 0);
   });
 }
+
+test("changing settings cannot reuse an old request or remove its replacement from deduplication", async () => {
+  const first = deferred();
+  const second = deferred();
+  const started = [deferred(), deferred()];
+  let calls = 0;
+  const { engine, check } = await fixture(() => {
+    const index = calls++;
+    started[index]?.resolve();
+    return index === 0 ? first.promise : second.promise;
+  });
+  const oldResult = check();
+  await started[0].promise;
+  engine.epoch++;
+  engine.pending.clear();
+  const replacement = check({ tabId: 2 });
+  await started[1].promise;
+  first.resolve(block);
+  assert.equal((await oldResult).status, "idle");
+  const shared = check({ tabId: 3 });
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(calls, 2);
+  second.resolve({ status: "allow" });
+  assert.deepEqual((await Promise.all([replacement, shared])).map(result => result.status), ["allow", "allow"]);
+});

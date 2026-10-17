@@ -21,7 +21,7 @@ export function pdfFailure(error) {
   return { status: "unreadable", reason: reason in messages ? reason : "unreadable", message: messages[reason] || messages.unreadable };
 }
 
-// Fetch only the tab's validated public URL. Never pass a PDF URL to the gateway.
+// Fetch only the tab's validated public URL; download and parsing stay local.
 // Redirects are refused so a public PDF cannot redirect the reader to a private host.
 export async function downloadPdf(url, { signal, fetcher = fetch, maxBytes = PDF_LIMITS.bytes } = {}) {
   if (!isPublicPage(url)) throw new PdfReadError("download");

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TabFit",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "description": "Describe your task. Jev helps keep your browsing on track during a focus session.",
   "minimum_chrome_version": "125",
   "incognito": "not_allowed",

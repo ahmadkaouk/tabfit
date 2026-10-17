@@ -26,34 +26,80 @@
     return response.data;
   };
 
+  const MARK = `<svg class="mark" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 20.5c2 0 3.5-1 3.5-3V8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v9.5c0 2 1.5 3 3.5 3z"/></svg>`;
+  const SANS = "TabFit Instrument Sans";
+  const MONO = "TabFit JetBrains Mono";
+  const pad = value => String(value).padStart(2, "0");
   const css = `
-    :host { all: initial !important; position: fixed !important; inset: 0 !important; z-index: 2147483647 !important; display: block !important; color-scheme: light !important; }
+    :host { all: initial !important; position: fixed !important; inset: 0 !important; z-index: 2147483647 !important; display: block !important; color-scheme: light dark !important; }
     * { box-sizing: border-box; }
-    .veil { position: fixed; inset: 0; display: grid; place-items: center; padding: 28px; background: #f7f7f2; color: #27382c; font: 15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-    .card { width: min(480px, 100%); text-align: center; }
-    .brand { font-size: 14px; font-weight: 700; letter-spacing: -.3px; display: flex; align-items: center; justify-content: center; gap: 9px; }
-    .mark { width: 24px; height: 24px; border: 7px solid #49644e; border-right-color: #b5c3a4; border-radius: 50%; display: inline-block; transform: rotate(-35deg); }
-    .orbit { height: 100px; width: 100px; border: 1px solid #ced8c5; border-radius: 50%; margin: 42px auto 27px; display: grid; place-items: center; box-shadow: 0 0 0 15px #eef1e8,0 0 0 16px #dfe5d8; }
-    .orbit .mark { height: 43px; width: 43px; border-width: 12px; }
-    .eyebrow { text-transform: uppercase; letter-spacing: 2px; font-size: 10px; font-weight: 700; color: #748170; margin: 25px 0 12px; }
-    h1 { font-family: Georgia,serif; font-size: clamp(30px,5vw,42px); line-height: 1.16; font-weight: 400; margin: 0 0 18px; letter-spacing: -1.2px; }
-    p { margin: 0 0 22px; color: #6b7468; }
-    .goal { background: #eef1e8; border: 1px solid #dfe5d7; border-radius: 14px; padding: 20px 23px; margin: 27px 0; text-align: left; overflow-wrap: anywhere; }
-    .goal small { display: block; font-size: 10px; letter-spacing: 1.3px; text-transform: uppercase; color: #798571; margin-bottom: 6px; }
-    .goal strong { font-size: 16px; font-weight: 500; }
-    button { font: inherit; cursor: pointer; border-radius: 10px; padding: 12px 18px; font-size: 13px; border: 1px solid #d9dfd3; background: transparent; color: #43543f; }
-    button:focus-visible { outline: 3px solid #92a676; outline-offset: 3px; }
-    button:hover { filter: brightness(.95); }
+    .veil, .notice, .chip { --bg: #ffffff; --surface: #f4f5f8; --surface-hover: #eceef3; --line: #e6e8ee; --ink: #0e1220; --muted: #646b7c; --faint: #a0a6b3;
+      --accent: #2f5bff; --accent-track: #e3e9ff; --on-accent: #ffffff; --warn: #d97706; --bad: #dc2626; --bad-soft: #fdecec; --bad-ink: #b42318;
+      --sans: '${SANS}',ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --mono: '${MONO}',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; color: var(--ink); }
+    @media (prefers-color-scheme: dark) { .veil, .notice, .chip { --bg: #0e1118; --surface: #171b25; --surface-hover: #1f2430; --line: #222735; --ink: #eceef4; --muted: #959cab; --faint: #5f6677;
+      --accent: #3f63ff; --accent-track: #1d2546; --on-accent: #ffffff; --warn: #fbbf24; --bad: #f87171; --bad-soft: rgb(248 113 113 / .12); --bad-ink: #fca5a5; } }
+    .mark { flex-shrink: 0; color: var(--accent); }
+    .mark path { fill: currentColor; }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+    .veil { position: fixed; inset: 0; overflow: auto; display: flex; flex-direction: column; padding: 0 28px 24px; background: var(--bg); outline: none; }
+    .top { flex-shrink: 0; height: 60px; margin: 0 -28px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+    .top [data-host] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card { width: min(520px, 100%); margin: auto; padding: 48px 0; display: flex; flex-direction: column; align-items: flex-start; }
+    .pill { height: 26px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; border-radius: 13px; background: var(--bad-soft); color: var(--bad-ink); font-size: 13px; font-weight: 600; }
+    .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--bad); }
+    h1 { margin: 16px 0 0; font: 600 clamp(36px, 5vw, 52px)/1.05 var(--sans); letter-spacing: -.03em; text-wrap: balance; }
+    p { margin: 12px 0 0; font-size: 16px; color: var(--muted); }
+    .focus { width: 100%; margin-top: 28px; padding: 16px 18px; background: var(--surface); border-radius: 14px; overflow-wrap: anywhere; }
+    .label { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .focus strong { display: block; margin-top: 2px; font-size: 17px; line-height: 1.4; font-weight: 600; }
+    .progress { margin-top: 16px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--accent-track); }
+    .progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .time { margin-top: 8px; display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--muted); }
+    .time b { font: 500 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+    .time b span { margin: 0 -.12em; }
+    button { height: 42px; padding: 0 18px; font: 600 14px var(--sans); cursor: pointer; border: 0; border-radius: 10px; background: transparent; color: var(--ink); transition: background .12s, opacity .12s, color .12s; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     button:disabled { opacity: .55; cursor: wait; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .primary { background: #49644e; color: white; border-color: #49644e; }
-    .link { border: 0; font-size: 12px; padding: 16px; color: #7e8877; }
-    .foot { font-size: 11px; margin-top: 20px; color: #87907e; }
-    .notice { position: fixed; top: 20px; right: 20px; max-width: min(360px,calc(100vw - 40px)); padding: 14px 18px; background: #f7f7f2; border: 1px solid #d8dfd1; border-radius: 14px; box-shadow: 0 6px 25px #15200d20; color: #4e6149; font: 12px/1.5 -apple-system,BlinkMacSystemFont,sans-serif; }
-    .notice button { font-size: 11px; padding: 4px 9px; margin-top: 8px; }
-    .error { color: #8e4735; font-size: 12px; margin-top: 12px; }
-    @media(prefers-reduced-motion:no-preference) { .loading .orbit { animation: breathe 2s ease-in-out infinite; } @keyframes breathe { 50% { transform: scale(.94); opacity: .65; } } }
+    .primary { background: var(--accent); color: var(--on-accent); }
+    .primary:hover { opacity: .9; }
+    .secondary { background: var(--surface); }
+    .secondary:hover { background: var(--surface-hover); }
+    .quiet { margin-left: auto; padding: 0 12px; color: var(--muted); }
+    .quiet:hover { color: var(--ink); background: var(--surface); }
+    .actions { width: 100%; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .error { margin-top: 12px; font-size: 14px; color: var(--bad); }
+    .error:empty { display: none; }
+    .foot { margin: 0; font-size: 13px; color: var(--muted); }
+    .chip { position: fixed; top: 20px; right: 20px; height: 34px; padding: 0 14px 0 12px; display: flex; align-items: center; gap: 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 17px; box-shadow: 0 10px 28px -12px rgb(14 18 32 / .3); font-size: 13px; font-weight: 500; color: var(--ink); animation: appear 0s .4s both; }
+    .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent-track); border-top-color: var(--accent); }
+    @keyframes appear { from { visibility: hidden; } }
+    .notice { position: fixed; top: 20px; right: 20px; width: 340px; max-width: calc(100vw - 40px); padding: 14px 16px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 44px -14px rgb(14 18 32 / .32); font-size: 14px; line-height: 1.5; }
+    .notice .brand { font-size: 13px; }
+    .notice .mark { width: 15px; height: 15px; }
+    .notice [data-text] { display: block; margin-top: 8px; }
+    .notice-actions { margin-top: 14px; display: flex; gap: 8px; }
+    .notice button { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .card { animation: enter .28s cubic-bezier(.2,.7,.3,1) both; }
+      .notice { animation: fade .2s ease both; }
+      .chip { animation: fade .2s ease .4s both; }
+      .spinner { animation: spin .8s linear infinite; }
+      @keyframes enter { from { opacity: 0; transform: translateY(6px); } }
+      @keyframes fade { from { opacity: 0; } }
+      @keyframes spin { to { transform: rotate(1turn); } }
+    }
   `;
+
+  function loadFont() {
+    // @font-face is ignored inside shadow roots, so the bundled face is registered on the document.
+    if (globalThis.__tabfitFont) return;
+    globalThis.__tabfitFont = send("FONT").then(faces => Promise.all(faces.map(({ family, weight, data, unicodeRange }) => {
+      const face = new FontFace(family, Uint8Array.from(atob(data), char => char.charCodeAt(0)), { weight, unicodeRange });
+      document.fonts.add(face);
+      return face.loaded;
+    }))).catch(() => { globalThis.__tabfitFont = null; });
+  }
 
   function removeUI() {
     clearTimeout(endTimer);
@@ -99,6 +145,15 @@
   function guardUI() {
     // Notices and blocking screens both expire, even after a worker/extension reload.
     if (!canDisplay()) return;
+    const time = shadow?.querySelector("[data-time]");
+    if (time) {
+      const ms = currentSession.endsAt - Date.now();
+      const seconds = Math.ceil(ms / 1000);
+      // A separate colon lets CSS close the gap a monospace colon leaves.
+      time.replaceChildren(pad(Math.floor(seconds / 60)), Object.assign(document.createElement("span"), { textContent: ":" }), pad(seconds % 60));
+      shadow.querySelector("[data-fill]").style.width = `${Math.max(0, Math.min(100, ms / currentSession.durationMs * 100))}%`;
+      shadow.querySelector("[data-total]").textContent = `${Math.round(currentSession.durationMs / 60000)} min session`;
+    }
     endTimer = setTimeout(guardUI, Math.max(1, Math.min(1000, currentSession.endsAt - Date.now())));
   }
 
@@ -131,31 +186,35 @@
         if (event.key !== "Tab") return;
         const buttons = [...shadow.querySelectorAll("button:not(:disabled)")];
         if (!buttons.length) return;
-        if (event.shiftKey && shadow.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1).focus(); }
-        if (!event.shiftKey && shadow.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); }
+        const index = buttons.indexOf(shadow.activeElement);
+        if (event.shiftKey ? index <= 0 : index === -1 || index === buttons.length - 1) {
+          event.preventDefault();
+          (event.shiftKey ? buttons.at(-1) : buttons[0]).focus();
+        }
       });
-      shadow.querySelector("button")?.focus({ preventScroll: true });
+      // Focus the dialog itself: no stray focus ring, and Enter can't trigger "End session".
+      shadow.querySelector(".veil").focus({ preventScroll: true });
     } else {
       host.style.setProperty("pointer-events", "none", "important");
-      shadow.querySelector(".notice").style.pointerEvents = "auto";
+      const card = shadow.querySelector(".notice");
+      if (card) card.style.pointerEvents = "auto";
     }
     guardUI();
   }
 
   function notice(text, retry = false) {
     if (!canDisplay()) return;
-    mount(`<div class="notice" role="status"><span></span><br><button>Dismiss</button>${retry ? " <button data-retry>Try again</button>" : ""}</div>`);
-    shadow.querySelector("span").textContent = text;
-    shadow.querySelector("button").onclick = removeUI;
+    mount(`<div class="notice" role="status"><span class="brand">${MARK}TabFit</span><span data-text></span><div class="notice-actions"><button class="secondary" data-dismiss>Dismiss</button>${retry ? `<button class="primary" data-retry>Try again</button>` : ""}</div></div>`);
+    shadow.querySelector("[data-text]").textContent = text;
+    shadow.querySelector("[data-dismiss]").onclick = removeUI;
     shadow.querySelector("[data-retry]")?.addEventListener("click", () => schedule(true));
   }
 
   function showChecking(isPdf = false) {
     if (!canDisplay()) return;
-    mount(`<div class="veil loading" role="dialog" aria-modal="true" aria-label="Checking page relevance"><div class="card"><div class="brand"><i class="mark"></i>TabFit</div><div class="orbit"><i class="mark"></i></div><h1>A moment for intention.</h1><p>Checking this page against your focus.</p><button class="link" data-end>End focus session</button></div></div>`, true);
+    // Checks never cover the page. The chip only becomes visible when a check is slow.
+    mount(`<div class="chip" role="status"><span class="spinner" aria-hidden="true"></span>${isPdf ? "Reading PDF" : "Checking page"}</div>`);
     checking = true;
-    if (isPdf) shadow.querySelector("p").textContent = "Reading this PDF and checking it against your focus.";
-    shadow.querySelector("[data-end]").onclick = endSession;
   }
 
   async function endSession() {
@@ -168,9 +227,9 @@
 
   function showBlock() {
     if (!canDisplay()) return;
-    mount(`<div class="veil" role="dialog" aria-modal="true" aria-labelledby="tabfit-title"><div class="card"><div class="brand"><i class="mark"></i>TabFit</div><div class="orbit"><i class="mark"></i></div><div class="eyebrow">A gentle course correction</div><h1 id="tabfit-title">Come back to your focus.</h1><p><span data-host></span> looks unrelated to your task.</p><div class="goal"><small>You made time for</small><strong></strong></div><div class="actions"><button class="primary" data-back>Go back</button><button data-allow>Allow this page</button></div><button class="link" data-end>End focus session</button><p class="foot">Jev can make mistakes. Your judgment comes first.</p><div class="error" role="alert"></div></div></div>`, true);
+    mount(`<div class="veil" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="tabfit-title"><div class="top"><div class="brand">${MARK}TabFit</div><span data-host></span></div><div class="card"><span class="pill">Off task</span><h1 id="tabfit-title">Stay on track.</h1><p>This page looks unrelated to what you’re working on.</p><div class="focus"><span class="label">Your focus</span><strong data-goal></strong><div class="progress" aria-hidden="true"><i data-fill></i></div><div class="time"><span><b data-time></b> left</span><span data-total></span></div></div><div class="actions"><button class="primary" data-back>Go back</button><button class="secondary" data-allow>Allow this page</button><button class="quiet" data-end>End session</button></div><div class="error" role="alert"></div></div><p class="foot">Jev can make mistakes. Your judgment comes first.</p></div>`, true);
     shadow.querySelector("[data-host]").textContent = location.hostname.replace(/^www\./, "");
-    shadow.querySelector("strong").textContent = currentSession.goal;
+    shadow.querySelector("[data-goal]").textContent = currentSession.goal;
     const back = shadow.querySelector("[data-back]");
     if (history.length <= 1) { back.textContent = "Leave this page"; back.onclick = () => location.assign("about:blank"); }
     else back.onclick = () => history.back();
@@ -233,11 +292,14 @@
       if (context.status !== "active") { reset(); return; }
       currentSession = context.session;
       if (!canDisplay()) return;
+      loadFont();
       const page = snapshot();
       const fingerprint = JSON.stringify([currentSession.id, url, page]);
       if (!force && fingerprint === lastFingerprint) return;
       lastFingerprint = fingerprint;
-      showChecking(page.kind === "pdf");
+      // A block screen stays in place while its page is re-checked.
+      const blocking = Boolean(shadow?.querySelector(".veil"));
+      if (!blocking) showChecking(page.kind === "pdf");
       const watchdog = setTimeout(() => {
         if (fresh() && checking) { revision++; lastFingerprint = ""; notice("The check took too long. This page is still accessible.", true); }
       }, page.kind === "pdf" ? 30000 : 16000);
@@ -246,7 +308,7 @@
       finally { clearTimeout(watchdog); }
       if (!fresh()) return;
       if (!canDisplay()) return;
-      if (result.status === "block") showBlock();
+      if (result.status === "block") { if (!shadow?.querySelector(".veil")) showBlock(); }
       else if (result.status === "uncertain") notice("Jev isn't sure this is off task, so this page stays accessible.");
       else if (result.status === "unreadable") { lastFingerprint = ""; notice(result.message, true); }
       else if (result.status === "error") { lastFingerprint = ""; notice(result.message, true); }
@@ -254,7 +316,7 @@
       else removeUI();
     } catch (error) {
       // A disconnected script cannot know whether a session is still running.
-      // Quietly clear stale state; confirmed gateway failures use result.status above.
+      // Quietly clear stale state; confirmed API failures use result.status above.
       if (!runtimeAvailable()) dispose();
       else if (fresh()) reset();
     } finally {

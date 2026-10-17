@@ -1,5 +1,7 @@
 import { digest, remainingTime, sanitizePage } from "./core.js";
 
+const CHECK_UNAVAILABLE = "Page checks are unavailable. This page is still accessible.";
+
 // Chrome persists only this small state in storage.session: no page excerpts or raw URLs.
 export class FocusSession {
   constructor({ state, classify, preparePage = async page => page, save = async () => {}, now = Date.now }) {
@@ -12,6 +14,7 @@ export class FocusSession {
     this.pending = new Map();
     this.tabJobs = new Map();
     this.cooldownUntil = 0;
+    this.cooldownMessage = CHECK_UNAVAILABLE;
   }
 
   active() {
@@ -27,6 +30,7 @@ export class FocusSession {
     if (![25, 50, 90].includes(minutes)) throw new Error("Choose a 25, 50 or 90 minute session.");
     this.epoch++;
     this.cooldownUntil = 0;
+    this.cooldownMessage = CHECK_UNAVAILABLE;
     this.state = {
       session: { id: crypto.randomUUID(), goal, startedAt: this.now(), endsAt: this.now() + minutes * 60000,
         durationMs: minutes * 60000, remainingMs: minutes * 60000, paused: false, checked: 0, blocked: 0 },
@@ -96,12 +100,12 @@ export class FocusSession {
       const cacheKey = await digest(JSON.stringify([s.id, urlKey, safePage]));
       const cached = this.state.cache[cacheKey];
       if (cached && cached.expiresAt > this.now()) return cached.decision;
-      if (this.cooldownUntil > this.now()) return { status: "error", message: "Jev is unavailable. Pages stay accessible; retry shortly." };
+      if (this.cooldownUntil > this.now()) return { status: "error", message: this.cooldownMessage };
       // Multiple tabs showing the same content share a request.
       if (!this.pending.has(cacheKey)) {
         const request = Promise.resolve().then(() => this.classify(s.goal, safePage));
         this.pending.set(cacheKey, request);
-        request.finally(() => this.pending.delete(cacheKey)).catch(() => {});
+        request.finally(() => { if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey); }).catch(() => {});
       }
       const decision = await this.pending.get(cacheKey);
       if (!await current()) return { status: "idle" };
@@ -120,9 +124,10 @@ export class FocusSession {
     } catch (error) {
       if (!await current()) return { status: "idle" };
       this.cooldownUntil = this.now() + 30000;
+      this.cooldownMessage = error.message || CHECK_UNAVAILABLE;
       this.state.lastDecision = { status: "error", host: new URL(url).hostname, at: this.now() };
       await this.persist();
-      return { status: "error", message: error.message || "Jev is unavailable. This page is still accessible." };
+      return { status: "error", message: this.cooldownMessage };
     }
   }
 }

@@ -5,33 +5,42 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
-import { createGateway } from "../server/server.mjs";
 import { makePdf } from "./pdf-fixture.mjs";
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 const profile = await mkdtemp(join(tmpdir(), "tabfit-extension-test-"));
 const out = resolve("test-results");
 await mkdir(out, { recursive: true });
-const token = "browser-test-connection-token-12345678";
+const apiKey = "fake-browser-api-key";
+const replacementKey = "fake-replacement-api-key";
 const requests = [];
+const authorizations = [];
 let holdResolve;
 let failed = false;
-const gateway = createGateway({ apiKey: "fake-browser-test-key", token, transport: async (_url, options) => {
-  const body = JSON.parse(options.body);
+const provider = http.createServer(async (request, response) => {
+  const reply = (status, body) => { if (!response.destroyed) { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); } };
+  if (request.url !== "/v1/systemone" || request.method !== "POST") return reply(404, {});
+  authorizations.push(request.headers.authorization);
+  if (![apiKey, replacementKey].some(key => request.headers.authorization === `Bearer ${key}`)) return reply(401, { error: "PRIVATE_PROVIDER_DETAILS" });
+  const parts = [];
+  for await (const part of request) parts.push(part);
+  const body = JSON.parse(Buffer.concat(parts));
   requests.push(body);
   if (body.state.page.title.includes("Delayed")) await new Promise(resolve => { holdResolve = resolve; });
-  if (failed) return new Response("unavailable", { status: 503 });
+  if (failed) return reply(503, { error: "PRIVATE_PROVIDER_DETAILS" });
   const choice = body.state.page.title.includes("Tutorial") || (body.state.page.description.startsWith("PDF text excerpt") && body.state.page.text.includes("inference")) ? "on_task" : body.state.page.title.includes("Unclear") ? "uncertain" : "off_task";
-  return new Response(JSON.stringify({ model: "jev-browser-fixture", answers: { relevance: { type: "choice", choice, confidence: 0.9,
-    probabilities: Object.fromEntries(["on_task", "off_task", "uncertain"].map(label => [label, label === choice ? 0.94 : 0.03])) } } }));
-} });
-gateway.listen(0, "127.0.0.1");
-await once(gateway, "listening");
-// Keep the installed extension and the user's running gateway untouched.
+  reply(200, { model: "jev-browser-fixture", answers: { relevance: { type: "choice", choice, confidence: 0.9,
+    probabilities: Object.fromEntries(["on_task", "off_task", "uncertain"].map(label => [label, label === choice ? 0.94 : 0.03])) } } });
+});
+provider.listen(0, "127.0.0.1");
+await once(provider, "listening");
+// The isolated copy calls a mock TypeSafe endpoint directly from its worker.
 const extensionPath = join(profile, "extension");
 await cp(resolve("extension"), extensionPath, { recursive: true });
-const backgroundPath = join(extensionPath, "background.js");
-await writeFile(backgroundPath, (await readFile(backgroundPath, "utf8")).replace("127.0.0.1:4318", `127.0.0.1:${gateway.address().port}`));
+const clientPath = join(extensionPath, "jev-client.js");
+await writeFile(clientPath, (await readFile(clientPath, "utf8")).replace("https://api.typesafe.ai/v1/systemone", `http://127.0.0.1:${provider.address().port}/v1/systemone`));
+const sessionPath = join(extensionPath, "session.js");
+await writeFile(sessionPath, (await readFile(sessionPath, "utf8")).replace("now = Date.now", "now = () => Date.now()"));
 const pdfDownloads = [];
 let delayedPdfResolve;
 const pdfFixture = process.env.PDF_FIXTURE_PATH ? await readFile(process.env.PDF_FIXTURE_PATH) : makePdf();
@@ -64,14 +73,17 @@ async function eventually(check, message, timeout = 12000) {
   throw new Error(message);
 }
 
-try {
-  context = await chromium.launchPersistentContext(profile, {
+const browserOptions = {
     executablePath: process.env.CHROMIUM_PATH || undefined, headless: true,
     viewport: { width: 1280, height: 850 },
+    // Entrance animations are skipped so screenshots capture settled UI.
+    reducedMotion: "reduce",
     ignoreDefaultArgs: ["--disable-extensions"],
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, "--no-first-run", "--disable-background-networking",
       "--host-resolver-rules=MAP pdf.focus-example.com 127.0.0.1", "--no-proxy-server"],
-  });
+};
+try {
+  context = await chromium.launchPersistentContext(profile, browserOptions);
   context.on("weberror", error => errors.push(String(error.error())));
   if (process.env.TABFIT_TEST_DEBUG) context.on("console", msg => console.log("Browser console:", msg.type(), msg.text().slice(0, 300)));
   context.setDefaultTimeout(12000);
@@ -81,17 +93,67 @@ try {
   let popup = await context.newPage();
   await popup.setViewportSize({ width: 400, height: 760 });
   await popup.goto(`chrome-extension://${id}/popup.html`);
-  await popup.locator("#connection-code").fill(token);
+  await popup.getByText("Add API key", { exact: true }).waitFor();
+  assert.equal(await worker.evaluate(() => chrome.permissions.contains({ permissions: ["nativeMessaging"] })), false);
+  assert.equal(requests.length, 0, "Idle setup must not call TypeSafe");
+  await popup.locator("#goal").fill("Build the authentication flow for my React app");
+  await popup.locator("#start-button").click();
+  await popup.getByText("Add your TypeSafe API key in Settings & privacy first.").waitFor();
+  await popup.locator("#api-key").fill(apiKey);
+  assert.equal(await popup.locator("#api-key").getAttribute("type"), "password");
   await popup.locator("#save-settings").click();
-  await popup.getByText("Gateway ready", { exact: true }).waitFor();
+  await popup.getByText("Add API key", { exact: true }).waitFor({ state: "hidden" });
+  assert.equal(await popup.locator("#api-key").inputValue(), "");
+  const state = await popup.evaluate(() => chrome.runtime.sendMessage({ type: "GET_STATE" }));
+  assert.equal(state.data.settings.hasApiKey, true);
+  assert.ok(!JSON.stringify(state).includes(apiKey), "Popup state must not return the key");
+  assert.equal(requests.length, 0, "Saving a key must not send a paid probe");
   await popup.locator("summary").click();
   await popup.locator("#goal").fill("Build the authentication flow for my React app");
+  await popup.mouse.move(0, 0);
   await popup.locator("body").screenshot({ path: join(out, "popup-setup.png") });
   assert.ok(await popup.locator("body").evaluate(el => el.scrollHeight) <= 600, "Setup should fit Chrome's popup height");
   await popup.locator("#start-button").click();
   await popup.locator("#session-view").waitFor({ state: "visible" });
   await popup.locator("body").screenshot({ path: join(out, "popup-session.png") });
   assert.ok(await popup.locator("body").evaluate(el => el.scrollHeight) <= 600, "Session should fit Chrome's popup height");
+
+  // The saved key survives browser restart; the running session does not.
+  await context.close();
+  context = await chromium.launchPersistentContext(profile, browserOptions);
+  context.on("weberror", error => errors.push(String(error.error())));
+  context.setDefaultTimeout(12000);
+  worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
+  popup = await context.newPage();
+  await popup.setViewportSize({ width: 400, height: 760 });
+  await popup.goto(`chrome-extension://${id}/popup.html`);
+  await popup.locator("#setup-view").waitFor({ state: "visible" });
+  await popup.getByText("Add API key", { exact: true }).waitFor({ state: "hidden" });
+  assert.equal(await popup.locator("#api-key").inputValue(), "");
+  assert.equal(requests.length, 0, "Restarting must not make a paid probe");
+  await popup.locator("#start-button").click();
+  await popup.locator("#session-view").waitFor({ state: "visible" });
+
+  // Replace and remove credentials through the actual settings UI.
+  await popup.locator("summary").click();
+  await popup.locator("#api-key").fill(replacementKey);
+  await popup.locator("#save-settings").click();
+  await popup.getByText("Settings saved. Your key will be used when you focus.").waitFor();
+  assert.equal(await worker.evaluate(async expected => (await chrome.storage.local.get("typeSafeApiKey")).typeSafeApiKey === expected, replacementKey), true);
+  await popup.locator("#remove-key").click();
+  await popup.getByText("Add API key", { exact: true }).waitFor();
+  // Settings is its own view; close it to reach the session controls.
+  await popup.locator("summary").click();
+  await popup.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  assert.equal(await worker.evaluate(async () => "typeSafeApiKey" in await chrome.storage.local.get("typeSafeApiKey")), false);
+  await popup.locator("#pause-button").click();
+  await popup.getByText("Add your TypeSafe API key in Settings & privacy first.").waitFor();
+  await popup.locator("#api-key").fill(replacementKey);
+  await popup.locator("#save-settings").click();
+  await popup.getByText("Add API key", { exact: true }).waitFor({ state: "hidden" });
+  await popup.locator("summary").click();
+  await popup.locator("#pause-button").click();
+  await popup.getByRole("button", { name: "Pause", exact: true }).waitFor();
 
   await context.route("**/*", route => {
     const url = new URL(route.request().url());
@@ -136,8 +198,24 @@ try {
   }
 
   await page.goto("https://focus-example.com/entertainment?token=URL_SECRET#private");
-  await eventually(() => hasText("Come back to your focus."), "Off-task page was not blocked");
+  await eventually(() => hasText("Stay on track."), "Off-task page was not blocked");
+  await eventually(() => page.evaluate(() => [...document.fonts].some(face => face.family.replace(/"/g, "") === "TabFit Instrument Sans" && face.status === "loaded")), "Focus screen font was not loaded");
   assert.equal(await page.locator("main").evaluate(el => el.inert), true);
+  const contentAccess = await worker.evaluate(async url => {
+    const [tab] = (await chrome.tabs.query({})).filter(tab => tab.url === url);
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: async () => {
+      let canReadKey = false;
+      try { canReadKey = Boolean((await chrome.storage.local.get("typeSafeApiKey")).typeSafeApiKey); } catch {}
+      const state = await chrome.runtime.sendMessage({ type: "GET_STATE", url: location.href });
+      return { canReadKey, state };
+    } });
+    return result.result;
+  }, page.url());
+  assert.equal(contentAccess.canReadKey, false, "Content scripts must not read the key from local storage");
+  assert.equal(contentAccess.state.ok, false, "Content scripts must not invoke popup actions");
+  assert.ok(!JSON.stringify(contentAccess).includes(replacementKey));
+  assert.deepEqual(await worker.evaluate(() => chrome.storage.sync.get(null)), {}, "Credentials must not sync");
+  assert.ok(authorizations.every(value => value === `Bearer ${replacementKey}`));
   await page.screenshot({ path: join(out, "blocked-page.png") });
   assert.doesNotMatch(JSON.stringify(requests), /FORM_SECRET|PASSWORD_SECRET|EDITOR_SECRET|HIDDEN_SECRET|URL_SECRET/);
   await clickOverlay("[data-allow]");
@@ -152,9 +230,9 @@ try {
   await eventually(() => requests.some(r => r.state.page.title.startsWith("Tutorial")), "On-task page was not classified");
   await eventually(async () => !await overlay(), "On-task page should be accessible");
 
-  // Real browser PDF viewer + real local PDF.js worker + mock Jev gateway.
+  // Real browser PDF viewer + real local PDF.js worker + mock TypeSafe endpoint.
   await page.goto(`${pdfOrigin}/resume.pdf?token=PDF_QUERY_SECRET`);
-  await eventually(() => requests.some(r => r.state.page.description.startsWith("PDF text excerpt")), "PDF text never reached the gateway", 20000);
+  await eventually(() => requests.some(r => r.state.page.description.startsWith("PDF text excerpt")), "PDF text never reached TypeSafe", 20000);
   const pdfRequest = requests.find(r => r.state.page.description.startsWith("PDF text excerpt"));
   assert.match(pdfRequest.state.page.text, /inference/);
   assert.ok(pdfRequest.state.page.text.length <= 4000);
@@ -169,7 +247,7 @@ try {
   assert.equal(requests.find(r => r.state.page.url.endsWith("/long.pdf")).state.page.text.length, 4000);
   await eventually(async () => !await overlay(), "Long PDF reading did not finish cleanly");
   await page.goto(`${pdfOrigin}/entertainment.pdf`);
-  await eventually(() => hasText("Come back to your focus."), "Off-task PDF was not blocked", 20000);
+  await eventually(() => hasText("Stay on track."), "Off-task PDF was not blocked", 20000);
   assert.match(requests.find(r => r.state.page.url.endsWith("/entertainment.pdf")).state.page.text, /Celebrity gossip/);
   await clickOverlay("[data-allow]");
   await eventually(async () => !await overlay(), "PDF override did not release the document");
@@ -196,7 +274,7 @@ try {
 
   // Simulate a client-side navigation and title update in an isolated test execution context.
   await page.evaluate(() => { history.pushState({}, "", "/entertainment-new"); document.title = "Celebrity gossip"; });
-  await eventually(() => hasText("Come back to your focus."), "SPA navigation was not reassessed");
+  await eventually(() => hasText("Stay on track."), "SPA navigation was not reassessed");
 
   await popup.bringToFront();
   await popup.locator("#pause-button").click();
@@ -205,13 +283,13 @@ try {
   await popup.bringToFront();
   await popup.locator("#pause-button").click();
   await page.bringToFront();
-  await eventually(() => hasText("Come back to your focus."), "Resuming did not restore protection");
+  await eventually(() => hasText("Stay on track."), "Resuming did not restore protection");
 
   await popup.bringToFront();
   await popup.locator("summary").click();
   await popup.locator("#exclusions").fill("focus-example.com");
   await popup.locator("#save-settings").click();
-  await popup.getByText("Gateway ready. Describe your task and start a session.").waitFor();
+  await popup.getByText("Settings saved. Your key will be used when you focus.").waitFor();
   const beforeExcluded = requests.length;
   const beforePdfDownloads = pdfDownloads.length;
   await page.bringToFront();
@@ -225,13 +303,16 @@ try {
   await popup.bringToFront();
   await popup.locator("#exclusions").fill("");
   await popup.locator("#save-settings").click();
-  await popup.getByText("Gateway ready. Describe your task and start a session.").waitFor();
+  await popup.getByText("Settings saved. Your key will be used when you focus.").waitFor();
   await popup.locator("summary").click();
   await page.bringToFront();
 
   await page.goto("https://focus-example.com/delayed");
   await eventually(() => Boolean(holdResolve), "Delayed check never started");
-  await clickOverlay("[data-end]");
+  assert.equal(await page.locator("main").evaluate(el => el.inert), false, "A pending check must not block the page");
+  await popup.bringToFront();
+  await popup.locator("#end-button").click();
+  await page.bringToFront();
   holdResolve();
   await eventually(async () => !await overlay(), "Ending the session did not release the page");
   await new Promise(resolve => setTimeout(resolve, 700));
@@ -298,6 +379,15 @@ try {
   await popup.bringToFront();
   await popup.locator("#end-button").click();
 
+  // Advance only the background clock: GET_STATE must expire the session and
+  // stop checks even before the browser's alarm fires.
+  await popup.locator("#start-button").click();
+  await popup.locator("#session-view").waitFor({ state: "visible" });
+  await worker.evaluate(() => { globalThis.testRealNow = Date.now; Date.now = () => testRealNow() + 26 * 60000; });
+  await popup.reload();
+  await popup.locator("#setup-view").waitFor({ state: "visible" });
+  await worker.evaluate(() => { Date.now = globalThis.testRealNow; delete globalThis.testRealNow; });
+
   // Finally invalidate the real extension context with runtime.reload. Keep the
   // webpage loaded and interact with it afterwards: the old script must stay quiet.
   // Some command-line Chromium builds don't reactivate unpacked extensions here.
@@ -313,7 +403,7 @@ try {
   assert.equal(await overlay(), undefined, "An invalidated script must remain quiet after tab reactivation");
   assert.equal(requests.length, reloadRequests, "Reloaded idle extension must not call Jev");
   assert.deepEqual(errors, [], `Browser errors: ${errors.join("; ")}`);
-  console.log(`Browser smoke passed: setup, session, block, override, reload, on-task, PDF extraction, extensionless PDFs, scanned/broken PDFs, stale PDF read, uncertainty, SPA navigation, pause/resume, site exclusions, stale reply, active failure, top-right notices, idle cleanup, extension reload, reinjection and notice expiry. ${requests.length} mock Jev requests.`);
+  console.log(`Browser smoke passed: API key save/replace/remove/persistence and content-script isolation, session lifecycle, block, override, on-task, PDFs, uncertainty, SPA navigation, exclusions, stale replies, provider failure and notice cleanup. ${requests.length} mock Jev requests.`);
   console.log(`Screenshots: ${out}`);
 } catch (error) {
   for (const [index, page] of (context?.pages() ?? []).entries()) {
@@ -325,8 +415,8 @@ try {
   holdResolve?.();
   delayedPdfResolve?.();
   await context?.close();
-  gateway.closeAllConnections();
-  gateway.close();
+  provider.closeAllConnections();
+  provider.close();
   pdfServer.closeAllConnections();
   pdfServer.close();
   await rm(profile, { recursive: true, force: true });
